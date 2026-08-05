@@ -15,8 +15,6 @@ A SIMT-style RISC-V GPU experiment written in SystemVerilog. Threads get grouped
 
 A host sets `thread_count`. `main_controller` turns that into a grid of blocks, then watches the `completed` lines. Whenever a core finishes a block, the controller pops the next block id into that slot and updates the per-slot thread count (the last block is usually smaller than `threads_per_block`). Each core runs its threads to completion and raises `core_done`; once all blocks are issued and everything reports done, the controller raises `done`.
 
-One quirk worth knowing: the controller has a one-cycle delay between a `completed` assertion and issuing the next block, and `done` shows up on a cycle where nothing new gets issued. The testbench just models this explicitly rather than pretending otherwise.
-
 ## Running the tests
 
 ```bash
