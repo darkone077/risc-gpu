@@ -21,7 +21,7 @@ module mem_controller #(
 
     logic [$clog2(REQ_CORES)-1:0] pri_pointer;
     logic [REQ_CORES-1:0] masked_req;
-    logic [$clog2(REQ_CORES)-1:0] core_serviced [0:CHANNELS-1];
+    logic [REQ_CORES-1:0] core_servicing;
     logic [CHANNELS-1:0] addr_valid_comb;
     typedef enum logic [1:0] {IDLE,DATA_READ,DATA_WRT} state_t;
     state_t state,state_nxt [0:CHANNELS-1];
@@ -30,7 +30,7 @@ module mem_controller #(
         if (~rst_n) begin
             data_done<=0;
             addr_valid<=0;
-
+            masked_req<={REQ_CORES{1'b1}};
             for (int i=0;i<CHANNELS;i++) begin
                 addr_o[i]<=0;
                 state[i]<=IDLE;
@@ -47,8 +47,9 @@ module mem_controller #(
                 case (state[i])
                     IDLE:begin
                         for (int j=0;j<REQ_CORES;j++) begin
-                            if (data_req[j]&state_nxt[i]!=IDLE) begin
+                            if (masked_req[j]&data_req[j]&state_nxt[i]!=IDLE) begin
                                 addr_o[i]<=addr_i[j];
+                                addr_valid[i]<=1'b1;
                             end
                         end
                     end 
@@ -66,14 +67,14 @@ module mem_controller #(
                     state_nxt=IDLE;
                     if (data_valid[i]) begin
                         for (int j=0;j<REQ_CORES;j++) begin
-                            if (data_req[j]&state_nxt[i]==IDLE) begin
+                            if (~core_servicing[j]&data_req[j]&state_nxt[i]==IDLE) begin
                                 state_nxt[i]=(read_wrt)?DATA_READ:DATA_WRT;
                             end
                         end
                     end
                 end
                 DATA_READ:begin
-                    if (data_valid) begin
+                    if (data_valid[i]) begin
                         state_nxt[i]=IDLE;
                     end
                     else begin
@@ -81,14 +82,16 @@ module mem_controller #(
                     end
                 end 
                 DATA_WRT:begin
-                    if (data_valid) begin
+                    if (data_valid[i]) begin
                         state_nxt[i]=IDLE;
                     end
                     else begin
                         state_nxt[i]=DATA_WRT;
                     end
                 end
-                default: 
+                default: begin
+                    state_nxt[i]=IDLE;
+                end
             endcase
         end
     end
